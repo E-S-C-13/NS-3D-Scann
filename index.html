@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free 3D Model Viewer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+        }
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(30, 30, 30, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        select {
+            width: 200px;
+            padding: 8px;
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            outline: none;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px 30px;
+            border-radius: 20px;
+            pointer-events: none;
+            display: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+    <!-- Three.js Core -->
+    <script src="https://cloudflare.com"></script>
+    <!-- Orbit Controls for Interaction -->
+    <script src="https://jsdelivr.net"></script>
+    <!-- STL Loader -->
+    <script src="https://jsdelivr.net"></script>
+    <!-- PLY Loader -->
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+
+    <div id="ui-container">
+        <label for="model-selector">Choose a Model:</label>
+        <select id="model-selector" onchange="loadSelectedModel()">
+            <!-- UPDATE THESE PATHS TO MATCH YOUR ACTUAL FILES IN YOUR REPOSITORY -->
+            <option value="models/model1.stl">Model 1 (STL)</option>
+            <option value="models/model2.ply">Model 2 (PLY)</option>
+        </select>
+    </div>
+
+    <div id="loading">Loading Model...</div>
+    <div id="canvas-container" id="viewer"></div>
+
+    <script>
+        let scene, camera, renderer, controls, currentMesh;
+        const container = document.getElementById('canvas-container');
+        const loadingEl = document.getElementById('loading');
+
+        // 1. Initialize the 3D Environment
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x222222);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 100);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Interaction Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lighting Configuration
+            const ambientLight = new THREE.AmbientLight(0x666666);
+            scene.add(ambientLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight1.position.set(1, 1, 1).normalize();
+            scene.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0x555555, 0.5);
+            dirLight2.position.set(-1, -1, -1).normalize();
+            scene.add(dirLight2);
+
+            // Handle window resizing
+            window.addEventListener('resize', onWindowResize);
+
+            // Load initial model
+            loadSelectedModel();
+            animate();
+        }
+
+        // 2. Parse and Load Models Dynamic depending on Extension
+        function loadSelectedModel() {
+            const fileUrl = document.getElementById('model-selector').value;
+            const extension = fileUrl.split('.').pop().toLowerCase();
+            
+            // Remove previous model if it exists
+            if (currentMesh) {
+                scene.remove(currentMesh);
+            }
+
+            loadingEl.style.display = 'block';
+
+            let loader;
+            if (extension === 'stl') {
+                loader = new THREE.STLLoader();
+            } else if (extension === 'ply') {
+                loader = new THREE.PLYLoader();
+            } else {
+                alert('Unsupported file format');
+                loadingEl.style.display = 'none';
+                return;
+            }
+
+            loader.load(fileUrl, function (geometry) {
+                // Material configuration (Adjust colors/roughness here)
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: 0x90caf9, 
+                    roughness: 0.4,
+                    metalness: 0.2
+                });
+                
+                // PLY files sometimes embed vertex colors
+                if (extension === 'ply' && geometry.attributes.color) {
+                    material.vertexColors = true;
+                    material.color.setHex(0xffffff); // Reset base color to let vertex colors show
+                }
+
+                geometry.computeVertexNormals();
+                currentMesh = new THREE.Mesh(geometry, material);
+
+                // Center the geometry automatically regardless of origin exports
+                geometry.center();
+
+                // Auto-scale and position camera based on model size bounding box
+                geometry.computeBoundingSphere();
+                const sphere = geometry.boundingSphere;
+                const radius = sphere.radius;
+                
+                // Adjust camera distance dynamically to fit the model perfectly
+                camera.position.set(0, 0, radius * 2.5);
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+
+                scene.add(currentMesh);
+                loadingEl.style.display = 'none';
+            }, 
+            // Progress callback
+            function (xhr) {
+                if (xhr.lengthComputable) {
+                    const percentComplete = Math.round((xhr.loaded / xhr.total) * 100);
+                    loadingEl.innerText = `Loading: ${percentComplete}%`;
+                }
+            },
+            // Error callback
+            function (error) {
+                console.error(error);
+                alert('Error loading model. Check file path and CORS constraints.');
+                loadingEl.style.display = 'none';
+            });
+        }
+
+        // 3. Animation and Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Start the application
+        window.onload = init;
+    </script>
+</body>
+</html>
