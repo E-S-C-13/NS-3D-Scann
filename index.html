@@ -1,450 +1,384 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3D Model Viewer · PLY & STL</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>3D Scan Comparison · GOM vs Creality Ferret</title>
 
   <!--
-    Using the UMD (global) build of Three.js r134 — no importmap, no ES modules.
-    This is the most reliable approach for GitHub Pages.
+    Online3DViewer engine (o3dv) — handles STL, PLY+texture, OBJ+MTL and more.
+    Load from jsDelivr (CDN) — no install needed.
+    Docs: https://kovacsv.github.io/Online3DViewer/Page_Usage.html
   -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/STLLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/PLYLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/online-3d-viewer@0.12.2/build/engine/o3dv.min.js"></script>
 
   <style>
+    /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ── Tokens ── */
     :root {
-      --bg:      #0d0f12;
-      --surface: #161a20;
-      --border:  #2a2f3a;
-      --accent:  #4f8ef7;
-      --accent2: #a78bfa;
-      --text:    #e2e8f0;
-      --muted:   #64748b;
-      --radius:  10px;
+      --ink:       #0b0d10;
+      --surface:   #13161b;
+      --panel:     #1a1e26;
+      --border:    #272c38;
+      --rule:      #323844;
+      --gom:       #e8c96a;   /* warm gold  — GOM brand feel */
+      --ferret:    #5db8f5;   /* cool blue  — Creality Ferret */
+      --text:      #dce3ee;
+      --muted:     #5a6478;
+      --radius:    6px;
+      --mono:      'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
     }
 
     html, body {
-      width: 100%; height: 100%;
-      background: var(--bg);
+      height: 100%;
+      background: var(--ink);
       color: var(--text);
       font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
       overflow: hidden;
     }
 
-    #viewport {
-      position: fixed;
-      inset: 0;
-      display: block;
+    /* ── Layout ── */
+    #app {
+      display: grid;
+      grid-template-rows: 54px 1fr;
+      height: 100vh;
     }
 
-    /* ── Panel ── */
-    #panel {
-      position: fixed;
-      top: 18px; left: 18px;
-      width: 250px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      z-index: 20;
-      box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    /* ── Top bar ── */
+    #topbar {
       display: flex;
-      flex-direction: column;
-      gap: 12px;
+      align-items: center;
+      gap: 20px;
+      padding: 0 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
 
-    .panel-title {
-      font-size: .68rem;
-      font-weight: 700;
-      letter-spacing: .12em;
+    #topbar h1 {
+      font-family: var(--mono);
+      font-size: .78rem;
+      font-weight: 400;
+      letter-spacing: .14em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    #topbar h1 span {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .separator {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      flex-shrink: 0;
     }
 
     /* Selector */
-    #model-selector {
-      width: 100%;
-      padding: 9px 28px 9px 10px;
-      background: #1e232c;
+    .selector-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .selector-wrap label {
+      font-family: var(--mono);
+      font-size: .68rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    #scan-selector {
+      background: var(--panel);
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: .85rem;
+      border-radius: var(--radius);
+      padding: 6px 28px 6px 10px;
+      font-size: .82rem;
+      font-family: inherit;
       cursor: pointer;
       outline: none;
       appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%235a6478' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
-      background-position: right 10px center;
-      transition: border-color .2s;
+      background-position: right 9px center;
+      transition: border-color .15s;
+      min-width: 180px;
     }
-    #model-selector:hover, #model-selector:focus { border-color: var(--accent); }
+    #scan-selector:hover, #scan-selector:focus { border-color: var(--gom); }
 
-    .divider { height: 1px; background: var(--border); }
+    /* ── Viewer area ── */
+    #viewers {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 0;
+    }
 
-    /* Sliders */
-    .ctrl-row { display: flex; flex-direction: column; gap: 5px; }
-    .ctrl-label {
-      font-size: .72rem;
-      color: var(--muted);
+    .viewer-col {
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
     }
-    input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+    .viewer-col + .viewer-col {
+      border-left: 2px solid var(--border);
+    }
 
-    /* Colour */
-    .color-row { display: flex; align-items: center; gap: 8px; }
-    input[type=color] {
-      width: 32px; height: 26px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      cursor: pointer;
-      background: none;
-      padding: 2px;
+    /* Label bar */
+    .viewer-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
-    .color-row label { font-size: .78rem; color: var(--muted); }
-
-    /* Wireframe toggle */
-    .toggle-row { display: flex; align-items: center; justify-content: space-between; }
-    .toggle-row > label { font-size: .78rem; color: var(--muted); }
-    .toggle { position: relative; width: 34px; height: 18px; }
-    .toggle input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; inset: 0;
-      background: var(--border);
-      border-radius: 20px;
-      cursor: pointer;
-      transition: background .2s;
-    }
-    .slider::before {
-      content: '';
-      position: absolute;
-      width: 12px; height: 12px;
-      left: 3px; top: 3px;
-      background: #fff;
+    .label-dot {
+      width: 8px; height: 8px;
       border-radius: 50%;
-      transition: transform .2s;
+      flex-shrink: 0;
     }
-    .toggle input:checked + .slider { background: var(--accent); }
-    .toggle input:checked + .slider::before { transform: translateX(16px); }
+    .gom-dot   { background: var(--gom); box-shadow: 0 0 6px var(--gom); }
+    .ferret-dot{ background: var(--ferret); box-shadow: 0 0 6px var(--ferret); }
 
-    /* Info */
-    #info-bar {
-      font-size: .72rem;
+    .label-name {
+      font-family: var(--mono);
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .gom-name    { color: var(--gom); }
+    .ferret-name { color: var(--ferret); }
+
+    .label-meta {
+      font-family: var(--mono);
+      font-size: .66rem;
       color: var(--muted);
-      border-top: 1px solid var(--border);
-      padding-top: 8px;
-      line-height: 1.7;
+      margin-left: auto;
     }
-    #info-bar b { color: var(--text); }
 
-    /* Loading */
-    #loading {
-      display: none;
-      position: fixed;
+    /* The actual viewer div — o3dv fills it */
+    .viewer-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    .ov-viewer {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Loading overlay per panel */
+    .loading-overlay {
+      position: absolute;
       inset: 0;
-      z-index: 40;
-      background: rgba(13,15,18,.8);
+      background: rgba(11,13,16,.85);
+      display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      flex-direction: column;
-      gap: 14px;
+      gap: 12px;
+      z-index: 10;
+      pointer-events: none;
+      transition: opacity .3s;
     }
-    #loading.visible { display: flex; }
+    .loading-overlay.hidden { opacity: 0; }
     .spinner {
-      width: 42px; height: 42px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
+      width: 36px; height: 36px;
+      border: 2px solid var(--border);
       border-radius: 50%;
-      animation: spin .8s linear infinite;
+      animation: spin .9s linear infinite;
     }
+    .gom-spinner    { border-top-color: var(--gom); }
+    .ferret-spinner { border-top-color: var(--ferret); }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #load-pct { color: var(--accent); font-size: .85rem; }
-
-    /* Toast */
-    #toast {
-      position: fixed;
-      bottom: 22px; left: 50%;
-      transform: translateX(-50%) translateY(70px);
-      background: #ef4444;
-      color: #fff;
-      padding: 10px 22px;
-      border-radius: 8px;
-      font-size: .85rem;
-      z-index: 60;
-      transition: transform .3s;
-      pointer-events: none;
-      max-width: 80vw;
-      text-align: center;
-    }
-    #toast.show { transform: translateX(-50%) translateY(0); }
-
-    /* Help */
-    #help {
-      position: fixed;
-      bottom: 16px; right: 16px;
+    .loading-text {
+      font-family: var(--mono);
       font-size: .7rem;
+      letter-spacing: .08em;
       color: var(--muted);
-      text-align: right;
-      line-height: 1.9;
+    }
+
+    /* ── Divider drag handle (visual only) ── */
+    #divider-hint {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
       pointer-events: none;
+      z-index: 5;
+      opacity: .35;
+    }
+    #divider-hint span {
+      display: block;
+      width: 2px; height: 6px;
+      background: var(--rule);
+      border-radius: 2px;
+    }
+
+    /* ── Responsive: stack on narrow screens ── */
+    @media (max-width: 640px) {
+      #viewers { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+      .viewer-col + .viewer-col { border-left: none; border-top: 2px solid var(--border); }
+      #divider-hint { display: none; }
     }
   </style>
 </head>
 <body>
+<div id="app">
 
-<canvas id="viewport"></canvas>
+  <!-- ── Top bar ── -->
+  <header id="topbar">
+    <h1>Scan <span>Compare</span></h1>
+    <div class="separator"></div>
+    <div class="selector-wrap">
+      <label for="scan-selector">Object</label>
+      <select id="scan-selector">
+        <!--
+          FORMAT of each option value:
+          GOM_URL | GOM_EXT | GOM_LABEL | FERRET_URL | FERRET_EXT | FERRET_LABEL
 
-<div id="panel">
-  <div class="panel-title">3D Model Viewer</div>
+          For PLY + texture: separate the PLY and JPG with a space in the URL field
+          e.g.  https://yourdomain.com/scans/obj1_ferret.ply https://yourdomain.com/scans/obj1_ferret.jpg
 
-  <select id="model-selector">
-    <!-- Add or rename your models here. Format: path|ext|Label -->
-    <option value="models/model1.stl|stl|Model 1">Model 1 — STL</option>
-    <option value="models/model2.ply|ply|Model 2">Model 2 — PLY</option>
-  </select>
+          UPDATE THESE URLS to point to your files on your host.
+        -->
+        <option value="https://yourdomain.com/scans/obj1_gom.stl|stl|Object 1 — GOM|https://yourdomain.com/scans/obj1_ferret.ply https://yourdomain.com/scans/obj1_ferret.jpg|ply|Object 1 — Ferret">
+          Object 1
+        </option>
+        <option value="https://yourdomain.com/scans/obj2_gom.stl|stl|Object 2 — GOM|https://yourdomain.com/scans/obj2_ferret.ply https://yourdomain.com/scans/obj2_ferret.jpg|ply|Object 2 — Ferret">
+          Object 2
+        </option>
+        <option value="https://yourdomain.com/scans/obj3_gom.stl|stl|Object 3 — GOM|https://yourdomain.com/scans/obj3_ferret.ply https://yourdomain.com/scans/obj3_ferret.jpg|ply|Object 3 — Ferret">
+          Object 3
+        </option>
+        <option value="https://yourdomain.com/scans/obj4_gom.stl|stl|Object 4 — GOM|https://yourdomain.com/scans/obj4_ferret.ply https://yourdomain.com/scans/obj4_ferret.jpg|ply|Object 4 — Ferret">
+          Object 4
+        </option>
+      </select>
+    </div>
+  </header>
 
-  <div class="divider"></div>
-  <div class="panel-title">Material</div>
+  <!-- ── Viewer columns ── -->
+  <section id="viewers">
 
-  <div class="ctrl-row">
-    <div class="ctrl-label"><span>Roughness</span><span id="roughVal">0.40</span></div>
-    <input type="range" id="rough" min="0" max="1" step="0.01" value="0.4">
-  </div>
-  <div class="ctrl-row">
-    <div class="ctrl-label"><span>Metalness</span><span id="metalVal">0.20</span></div>
-    <input type="range" id="metal" min="0" max="1" step="0.01" value="0.2">
-  </div>
-  <div class="color-row">
-    <input type="color" id="mesh-color" value="#90caf9">
-    <label for="mesh-color">Mesh colour</label>
-  </div>
-  <div class="toggle-row">
-    <label for="wf">Wireframe</label>
-    <label class="toggle">
-      <input type="checkbox" id="wf">
-      <span class="slider"></span>
-    </label>
-  </div>
+    <!-- LEFT: GOM -->
+    <div class="viewer-col">
+      <div class="viewer-label">
+        <span class="label-dot gom-dot"></span>
+        <span class="label-name gom-name">GOM</span>
+        <span class="label-meta" id="gom-meta">STL · professional metrology</span>
+      </div>
+      <div class="viewer-wrap">
+        <div id="gom-viewer" class="ov-viewer"></div>
+        <div class="loading-overlay" id="gom-loading">
+          <div class="spinner gom-spinner"></div>
+          <div class="loading-text">Loading GOM scan…</div>
+        </div>
+      </div>
+    </div>
 
-  <div id="info-bar">Select a model above to begin.</div>
+    <!-- RIGHT: Creality Ferret -->
+    <div class="viewer-col">
+      <div class="viewer-label">
+        <span class="label-dot ferret-dot"></span>
+        <span class="label-name ferret-name">Creality Ferret</span>
+        <span class="label-meta" id="ferret-meta">PLY · consumer scanner</span>
+      </div>
+      <div class="viewer-wrap">
+        <div id="ferret-viewer" class="ov-viewer"></div>
+        <div class="loading-overlay" id="ferret-loading">
+          <div class="spinner ferret-spinner"></div>
+          <div class="loading-text">Loading Ferret scan…</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
 </div>
 
-<div id="loading">
-  <div class="spinner"></div>
-  <div id="load-pct">Loading…</div>
-</div>
-
-<div id="toast"></div>
-
-<div id="help">
-  🖱 Left drag · rotate &nbsp;|&nbsp; Right drag · pan<br>
-  Scroll · zoom &nbsp;|&nbsp; Double-click · reset view
-</div>
+<!-- centre divider hint -->
+<div id="divider-hint"><span></span><span></span><span></span><span></span><span></span></div>
 
 <script>
-  // All Three.js globals (THREE.Scene, THREE.OrbitControls, etc.) are
-  // already available from the UMD <script> tags above.
+  // ── Viewer instances (reused across loads) ──────────────────────────────
+  var gomViewer    = null;
+  var ferretViewer = null;
 
-  var canvas    = document.getElementById('viewport');
-  var loadingEl = document.getElementById('loading');
-  var loadPct   = document.getElementById('load-pct');
-  var infoBar   = document.getElementById('info-bar');
-  var toast     = document.getElementById('toast');
+  // Shared dark background colour for both panels
+  var BG = new OV.RGBAColor(11, 13, 16, 255);
 
-  // ── Renderer ────────────────────────────────────────────────────────────
-  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  setSize();
-
-  // ── Scene ────────────────────────────────────────────────────────────────
-  var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0d0f12);
-
-  // ── Camera ───────────────────────────────────────────────────────────────
-  var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 5000);
-  camera.position.set(0, 0, 5);
-
-  // ── Controls ─────────────────────────────────────────────────────────────
-  var controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.06;
-
-  // ── Lights ───────────────────────────────────────────────────────────────
-  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-
-  var sun = new THREE.DirectionalLight(0xffffff, 0.9);
-  sun.position.set(3, 5, 4);
-  sun.castShadow = true;
-  scene.add(sun);
-
-  var fill = new THREE.DirectionalLight(0x6699ff, 0.35);
-  fill.position.set(-3, -2, -3);
-  scene.add(fill);
-
-  // ── Grid ─────────────────────────────────────────────────────────────────
-  var grid = new THREE.GridHelper(10, 20, 0x2a2f3a, 0x1e2229);
-  scene.add(grid);
-
-  var currentMesh = null;
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  function setSize() {
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-
-  function showToast(msg, ms) {
-    toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(function() { toast.classList.remove('show'); }, ms || 5000);
-  }
-
-  function fmt(n) { return Math.round(n).toLocaleString(); }
-
-  function fitCamera(geo) {
-    geo.computeBoundingBox();
-    var box    = geo.boundingBox;
-    var center = new THREE.Vector3();
-    var size   = new THREE.Vector3();
-    box.getCenter(center);
-    box.getSize(size);
-    var maxDim = Math.max(size.x, size.y, size.z);
-
-    controls.target.copy(center);
-    camera.position.set(center.x, center.y, center.z + maxDim * 2.5);
-    camera.near = maxDim * 0.001;
-    camera.far  = maxDim * 200;
-    camera.updateProjectionMatrix();
-    controls.update();
-
-    grid.position.y = box.min.y;
-    grid.scale.setScalar(maxDim * 0.4);
-  }
-
-  function syncMaterial() {
-    if (!currentMesh) return;
-    var m = currentMesh.material;
-    m.roughness = parseFloat(document.getElementById('rough').value);
-    m.metalness = parseFloat(document.getElementById('metal').value);
-    m.wireframe = document.getElementById('wf').checked;
-    if (!m.vertexColors) {
-      m.color.set(document.getElementById('mesh-color').value);
-    }
-    m.needsUpdate = true;
-  }
-
-  function onGeometry(geo, label, hasVertexColor) {
-    if (currentMesh) {
-      scene.remove(currentMesh);
-      currentMesh.geometry.dispose();
-      currentMesh.material.dispose();
-    }
-
-    geo.computeVertexNormals();
-    geo.center();
-
-    var color = hasVertexColor
-      ? 0xffffff
-      : parseInt(document.getElementById('mesh-color').value.replace('#', ''), 16);
-
-    var mat = new THREE.MeshStandardMaterial({
-      color:        color,
-      roughness:    parseFloat(document.getElementById('rough').value),
-      metalness:    parseFloat(document.getElementById('metal').value),
-      vertexColors: hasVertexColor,
-      wireframe:    document.getElementById('wf').checked
+  function makeViewer(elementId) {
+    var el = document.getElementById(elementId);
+    return new OV.EmbeddedViewer(el, {
+      backgroundColor: BG,
+      defaultColor: new OV.RGBColor(160, 170, 185),
+      edgeSettings: new OV.EdgeSettings(false, new OV.RGBColor(0, 0, 0), 1)
     });
-
-    currentMesh = new THREE.Mesh(geo, mat);
-    currentMesh.castShadow    = true;
-    currentMesh.receiveShadow = true;
-    scene.add(currentMesh);
-
-    fitCamera(geo);
-
-    var pos   = geo.attributes.position;
-    var verts = pos ? pos.count : 0;
-    var faces = geo.index ? geo.index.count / 3 : verts / 3;
-    infoBar.innerHTML = '<b>' + label + '</b><br>Vertices: <b>' + fmt(verts) + '</b> &nbsp; Faces: <b>' + fmt(faces) + '</b>';
-
-    loadingEl.classList.remove('visible');
   }
 
-  // ── Model loading ─────────────────────────────────────────────────────────
-  function loadModel(url, ext, label) {
-    loadingEl.classList.add('visible');
-    loadPct.textContent = 'Loading…';
-
-    function onProgress(xhr) {
-      if (xhr.lengthComputable) {
-        loadPct.textContent = 'Loading… ' + Math.round(xhr.loaded / xhr.total * 100) + '%';
-      }
-    }
-
-    function onError(err) {
-      console.error(err);
-      loadingEl.classList.remove('visible');
-      showToast('❌ Could not load "' + url + '". Make sure the file is committed to your repo under models/');
-    }
-
-    if (ext === 'stl') {
-      new THREE.STLLoader().load(url, function(geo) {
-        onGeometry(geo, label, false);
-      }, onProgress, onError);
-
-    } else if (ext === 'ply') {
-      new THREE.PLYLoader().load(url, function(geo) {
-        onGeometry(geo, label, !!geo.attributes.color);
-      }, onProgress, onError);
-    }
+  function hideLoading(id) {
+    // o3dv doesn't expose a load-complete callback in the embed API,
+    // so we hide the overlay after a generous timeout.
+    // For large files, increase this value.
+    setTimeout(function() {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    }, 3500);
   }
 
-  function loadSelected() {
-    var parts = document.getElementById('model-selector').value.split('|');
-    loadModel(parts[0], parts[1], parts[2]);
+  // ── Load a pair of scans ────────────────────────────────────────────────
+  function loadPair(gomUrls, ferretUrls) {
+    // Show loading overlays
+    document.getElementById('gom-loading').classList.remove('hidden');
+    document.getElementById('ferret-loading').classList.remove('hidden');
+
+    // Destroy old viewers and recreate (cleanest way to reset o3dv state)
+    document.getElementById('gom-viewer').innerHTML    = '';
+    document.getElementById('ferret-viewer').innerHTML = '';
+    gomViewer    = makeViewer('gom-viewer');
+    ferretViewer = makeViewer('ferret-viewer');
+
+    gomViewer.LoadModelFromUrlList(gomUrls);
+    ferretViewer.LoadModelFromUrlList(ferretUrls);
+
+    hideLoading('gom-loading');
+    hideLoading('ferret-loading');
   }
 
-  // ── UI events ─────────────────────────────────────────────────────────────
-  document.getElementById('model-selector').addEventListener('change', loadSelected);
+  // ── Parse selector value and trigger load ──────────────────────────────
+  function onScanChange() {
+    var val    = document.getElementById('scan-selector').value;
+    var halves = val.split('|');
+    // halves: [gomUrls, gomExt, gomLabel, ferretUrls, ferretExt, ferretLabel]
+    var gomUrls    = halves[0].trim().split(' ');
+    var ferretUrls = halves[3].trim().split(' ');
 
-  document.getElementById('rough').addEventListener('input', function(e) {
-    document.getElementById('roughVal').textContent = parseFloat(e.target.value).toFixed(2);
-    syncMaterial();
-  });
-  document.getElementById('metal').addEventListener('input', function(e) {
-    document.getElementById('metalVal').textContent = parseFloat(e.target.value).toFixed(2);
-    syncMaterial();
-  });
-  document.getElementById('mesh-color').addEventListener('input', syncMaterial);
-  document.getElementById('wf').addEventListener('change', syncMaterial);
+    document.getElementById('gom-meta').textContent    = halves[2] || 'GOM STL';
+    document.getElementById('ferret-meta').textContent = halves[5] || 'Ferret PLY';
 
-  canvas.addEventListener('dblclick', function() {
-    if (currentMesh) fitCamera(currentMesh.geometry);
-  });
-
-  window.addEventListener('resize', function() {
-    setSize();
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-  });
-
-  // ── Render loop ────────────────────────────────────────────────────────────
-  function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
+    loadPair(gomUrls, ferretUrls);
   }
-  animate();
 
-  // Load the first model immediately on page open
-  loadSelected();
+  document.getElementById('scan-selector').addEventListener('change', onScanChange);
+
+  // ── Init on page load ──────────────────────────────────────────────────
+  window.addEventListener('load', function() {
+    onScanChange();
+  });
 </script>
 </body>
 </html>
