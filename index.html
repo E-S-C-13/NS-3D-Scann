@@ -1,218 +1,407 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free 3D Model Viewer</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #fff;
-        }
-        #ui-container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 10;
-            background: rgba(30, 30, 30, 0.85);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        select {
-            width: 200px;
-            padding: 8px;
-            background: #333;
-            color: #fff;
-            border: 1px solid #555;
-            border-radius: 4px;
-            cursor: pointer;
-            outline: none;
-        }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 18px;
-            background: rgba(0,0,0,0.7);
-            padding: 15px 30px;
-            border-radius: 20px;
-            pointer-events: none;
-            display: none;
-        }
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-        }
-    </style>
-    <!-- Three.js Core -->
-    <script src="https://cloudflare.com"></script>
-    <!-- Orbit Controls for Interaction -->
-    <script src="https://jsdelivr.net"></script>
-    <!-- STL Loader -->
-    <script src="https://jsdelivr.net"></script>
-    <!-- PLY Loader -->
-    <script src="https://jsdelivr.net"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Model Viewer · PLY & STL</title>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js"
+    }
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0f12;
+      --surface: #161a20;
+      --border:  #2a2f3a;
+      --accent:  #4f8ef7;
+      --accent2: #a78bfa;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  10px;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    #viewport { position: fixed; inset: 0; }
+
+    /* ── Panel ── */
+    #panel {
+      position: fixed;
+      top: 18px; left: 18px;
+      width: 250px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      z-index: 20;
+      box-shadow: 0 8px 32px rgba(0,0,0,.55);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-title {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    /* Model selector */
+    #model-selector {
+      width: 100%;
+      padding: 9px 10px;
+      background: #1e232c;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: .85rem;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+      transition: border-color .2s;
+    }
+    #model-selector:hover, #model-selector:focus { border-color: var(--accent); }
+
+    .divider { height: 1px; background: var(--border); }
+
+    /* Sliders */
+    .ctrl-row { display: flex; flex-direction: column; gap: 5px; }
+    .ctrl-label {
+      font-size: .72rem; color: var(--muted);
+      display: flex; justify-content: space-between;
+    }
+    input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+    /* Colour + wireframe */
+    .color-row { display: flex; align-items: center; gap: 8px; }
+    input[type=color] {
+      width: 32px; height: 26px;
+      border: 1px solid var(--border); border-radius: 4px;
+      cursor: pointer; background: none; padding: 2px;
+    }
+    .color-row label { font-size: .78rem; color: var(--muted); }
+
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+    .toggle-row label { font-size: .78rem; color: var(--muted); }
+    .toggle { position: relative; width: 34px; height: 18px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0;
+      background: var(--border); border-radius: 20px;
+      cursor: pointer; transition: background .2s;
+    }
+    .slider::before {
+      content: ''; position: absolute;
+      width: 12px; height: 12px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: transform .2s;
+    }
+    .toggle input:checked + .slider { background: var(--accent); }
+    .toggle input:checked + .slider::before { transform: translateX(16px); }
+
+    /* Info */
+    #info-bar {
+      font-size: .72rem; color: var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top: 8px; line-height: 1.7;
+    }
+    #info-bar b { color: var(--text); }
+
+    /* Loading */
+    #loading {
+      display: none; position: fixed; inset: 0; z-index: 40;
+      background: rgba(13,15,18,.8);
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px;
+    }
+    #loading.visible { display: flex; }
+    .spinner {
+      width: 42px; height: 42px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #load-pct { color: var(--accent); font-size: .85rem; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 22px; left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: #ef4444; color: #fff;
+      padding: 10px 20px; border-radius: 8px;
+      font-size: .85rem; z-index: 60;
+      transition: transform .3s; pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Help */
+    #help {
+      position: fixed; bottom: 16px; right: 16px;
+      font-size: .7rem; color: var(--muted);
+      text-align: right; line-height: 1.9;
+      pointer-events: none;
+    }
+  </style>
 </head>
 <body>
 
-    <div id="ui-container">
-        <label for="model-selector">Choose a Model:</label>
-        <select id="model-selector" onchange="loadSelectedModel()">
-            <!-- UPDATE THESE PATHS TO MATCH YOUR ACTUAL FILES IN YOUR REPOSITORY -->
-            <option value="models/model1.stl">Model 1 (STL)</option>
-            <option value="models/model2.ply">Model 2 (PLY)</option>
-        </select>
-    </div>
+<canvas id="viewport"></canvas>
 
-    <div id="loading">Loading Model...</div>
-    <div id="canvas-container" id="viewer"></div>
+<div id="panel">
+  <div class="panel-title">3D Model Viewer</div>
 
-    <script>
-        let scene, camera, renderer, controls, currentMesh;
-        const container = document.getElementById('canvas-container');
-        const loadingEl = document.getElementById('loading');
+  <!-- Model selector -->
+  <select id="model-selector">
+    <option value="models/model1.stl|stl|Model 1">Model 1 — STL</option>
+    <option value="models/model2.ply|ply|Model 2">Model 2 — PLY</option>
+  </select>
 
-        // 1. Initialize the 3D Environment
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x222222);
+  <div class="divider"></div>
 
-            // Camera setup
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 100);
+  <!-- Material controls -->
+  <div class="panel-title">Material</div>
 
-            // Renderer setup
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            container.appendChild(renderer.domElement);
+  <div class="ctrl-row">
+    <div class="ctrl-label"><span>Roughness</span><span id="roughVal">0.40</span></div>
+    <input type="range" id="rough" min="0" max="1" step="0.01" value="0.4">
+  </div>
+  <div class="ctrl-row">
+    <div class="ctrl-label"><span>Metalness</span><span id="metalVal">0.20</span></div>
+    <input type="range" id="metal" min="0" max="1" step="0.01" value="0.2">
+  </div>
+  <div class="color-row">
+    <input type="color" id="mesh-color" value="#90caf9">
+    <label for="mesh-color">Mesh colour</label>
+  </div>
+  <div class="toggle-row">
+    <label for="wf">Wireframe</label>
+    <label class="toggle">
+      <input type="checkbox" id="wf">
+      <span class="slider"></span>
+    </label>
+  </div>
 
-            // Interaction Controls
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
+  <div id="info-bar">Select a model above to begin.</div>
+</div>
 
-            // Lighting Configuration
-            const ambientLight = new THREE.AmbientLight(0x666666);
-            scene.add(ambientLight);
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="load-pct">Loading…</div>
+</div>
 
-            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight1.position.set(1, 1, 1).normalize();
-            scene.add(dirLight1);
+<div id="toast"></div>
 
-            const dirLight2 = new THREE.DirectionalLight(0x555555, 0.5);
-            dirLight2.position.set(-1, -1, -1).normalize();
-            scene.add(dirLight2);
+<div id="help">
+  🖱 Left drag · rotate &nbsp;|&nbsp; Right drag · pan<br>
+  Scroll · zoom &nbsp;|&nbsp; Double-click · reset view
+</div>
 
-            // Handle window resizing
-            window.addEventListener('resize', onWindowResize);
+<script type="module">
+  import * as THREE from 'three';
 
-            // Load initial model
-            loadSelectedModel();
-            animate();
-        }
+  // Load Three.js UMD addon scripts (OrbitControls, STLLoader, PLYLoader)
+  const BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
+  async function loadScript(url) {
+    const code = await fetch(url).then(r => r.text());
+    new Function('THREE', code)(THREE);
+  }
+  await loadScript(BASE + 'controls/OrbitControls.js');
+  await loadScript(BASE + 'loaders/STLLoader.js');
+  await loadScript(BASE + 'loaders/PLYLoader.js');
 
-        // 2. Parse and Load Models Dynamic depending on Extension
-        function loadSelectedModel() {
-            const fileUrl = document.getElementById('model-selector').value;
-            const extension = fileUrl.split('.').pop().toLowerCase();
-            
-            // Remove previous model if it exists
-            if (currentMesh) {
-                scene.remove(currentMesh);
-            }
+  // ── Scene ──────────────────────────────────────────────────────────────
+  const canvas    = document.getElementById('viewport');
+  const loadingEl = document.getElementById('loading');
+  const loadPct   = document.getElementById('load-pct');
+  const infoBar   = document.getElementById('info-bar');
+  const toast     = document.getElementById('toast');
 
-            loadingEl.style.display = 'block';
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  setSize();
 
-            let loader;
-            if (extension === 'stl') {
-                loader = new THREE.STLLoader();
-            } else if (extension === 'ply') {
-                loader = new THREE.PLYLoader();
-            } else {
-                alert('Unsupported file format');
-                loadingEl.style.display = 'none';
-                return;
-            }
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d0f12);
 
-            loader.load(fileUrl, function (geometry) {
-                // Material configuration (Adjust colors/roughness here)
-                const material = new THREE.MeshStandardMaterial({ 
-                    color: 0x90caf9, 
-                    roughness: 0.4,
-                    metalness: 0.2
-                });
-                
-                // PLY files sometimes embed vertex colors
-                if (extension === 'ply' && geometry.attributes.color) {
-                    material.vertexColors = true;
-                    material.color.setHex(0xffffff); // Reset base color to let vertex colors show
-                }
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 5000);
+  camera.position.set(0, 0, 5);
 
-                geometry.computeVertexNormals();
-                currentMesh = new THREE.Mesh(geometry, material);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
 
-                // Center the geometry automatically regardless of origin exports
-                geometry.center();
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+  sun.position.set(3, 5, 4);
+  sun.castShadow = true;
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x6699ff, 0.35);
+  fill.position.set(-3, -2, -3);
+  scene.add(fill);
 
-                // Auto-scale and position camera based on model size bounding box
-                geometry.computeBoundingSphere();
-                const sphere = geometry.boundingSphere;
-                const radius = sphere.radius;
-                
-                // Adjust camera distance dynamically to fit the model perfectly
-                camera.position.set(0, 0, radius * 2.5);
-                camera.lookAt(0, 0, 0);
-                controls.target.set(0, 0, 0);
-                controls.update();
+  // Grid
+  const grid = new THREE.GridHelper(10, 20, 0x2a2f3a, 0x1e2229);
+  scene.add(grid);
 
-                scene.add(currentMesh);
-                loadingEl.style.display = 'none';
-            }, 
-            // Progress callback
-            function (xhr) {
-                if (xhr.lengthComputable) {
-                    const percentComplete = Math.round((xhr.loaded / xhr.total) * 100);
-                    loadingEl.innerText = `Loading: ${percentComplete}%`;
-                }
-            },
-            // Error callback
-            function (error) {
-                console.error(error);
-                alert('Error loading model. Check file path and CORS constraints.');
-                loadingEl.style.display = 'none';
-            });
-        }
+  let currentMesh = null;
 
-        // 3. Animation and Render Loop
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function setSize() {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+  function showToast(msg, ms = 4500) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), ms);
+  }
 
-        // Start the application
-        window.onload = init;
-    </script>
+  function fmt(n) { return Math.round(n).toLocaleString(); }
+
+  function fitCamera(geo) {
+    geo.computeBoundingBox();
+    const box    = geo.boundingBox;
+    const center = new THREE.Vector3();
+    const size   = new THREE.Vector3();
+    box.getCenter(center);
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    controls.target.copy(center);
+    camera.position.set(center.x, center.y, center.z + maxDim * 2);
+    camera.near = maxDim * 0.001;
+    camera.far  = maxDim * 100;
+    camera.updateProjectionMatrix();
+    controls.update();
+
+    grid.position.y = box.min.y;
+    grid.scale.setScalar(maxDim * 0.4);
+  }
+
+  function syncMaterial() {
+    if (!currentMesh) return;
+    const m = currentMesh.material;
+    m.roughness = parseFloat(document.getElementById('rough').value);
+    m.metalness = parseFloat(document.getElementById('metal').value);
+    m.wireframe = document.getElementById('wf').checked;
+    if (!m.vertexColors) m.color.set(document.getElementById('mesh-color').value);
+    m.needsUpdate = true;
+  }
+
+  function onGeometry(geo, label, hasVertexColor) {
+    if (currentMesh) {
+      scene.remove(currentMesh);
+      currentMesh.geometry.dispose();
+      currentMesh.material.dispose();
+    }
+
+    geo.computeVertexNormals();
+    geo.center();
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: hasVertexColor ? 0xffffff : parseInt(document.getElementById('mesh-color').value.replace('#',''), 16),
+      roughness: parseFloat(document.getElementById('rough').value),
+      metalness: parseFloat(document.getElementById('metal').value),
+      vertexColors: hasVertexColor,
+      wireframe: document.getElementById('wf').checked,
+    });
+
+    currentMesh = new THREE.Mesh(geo, mat);
+    currentMesh.castShadow = true;
+    currentMesh.receiveShadow = true;
+    scene.add(currentMesh);
+
+    fitCamera(geo);
+
+    const verts = geo.attributes.position ? geo.attributes.position.count : 0;
+    const faces = geo.index ? geo.index.count / 3 : verts / 3;
+    infoBar.innerHTML = `<b>${label}</b><br>Vertices: <b>${fmt(verts)}</b> &nbsp; Faces: <b>${fmt(faces)}</b>`;
+
+    loadingEl.classList.remove('visible');
+  }
+
+  // ── Model loading ──────────────────────────────────────────────────────
+  function loadModel(url, ext, label) {
+    loadingEl.classList.add('visible');
+    loadPct.textContent = 'Loading…';
+
+    const onProgress = xhr => {
+      if (xhr.lengthComputable)
+        loadPct.textContent = `Loading… ${Math.round(xhr.loaded / xhr.total * 100)}%`;
+    };
+    const onError = () => {
+      loadingEl.classList.remove('visible');
+      showToast('❌ Could not load model. Check the file path and that it is committed to your repo.');
+    };
+
+    if (ext === 'stl') {
+      new THREE.STLLoader().load(url, geo => onGeometry(geo, label, false), onProgress, onError);
+    } else if (ext === 'ply') {
+      new THREE.PLYLoader().load(url, geo => onGeometry(geo, label, !!geo.attributes.color), onProgress, onError);
+    }
+  }
+
+  function loadSelected() {
+    const [url, ext, label] = document.getElementById('model-selector').value.split('|');
+    loadModel(url, ext, label);
+  }
+
+  // ── UI events ──────────────────────────────────────────────────────────
+  document.getElementById('model-selector').addEventListener('change', loadSelected);
+
+  document.getElementById('rough').addEventListener('input', e => {
+    document.getElementById('roughVal').textContent = parseFloat(e.target.value).toFixed(2);
+    syncMaterial();
+  });
+  document.getElementById('metal').addEventListener('input', e => {
+    document.getElementById('metalVal').textContent = parseFloat(e.target.value).toFixed(2);
+    syncMaterial();
+  });
+  document.getElementById('mesh-color').addEventListener('input', syncMaterial);
+  document.getElementById('wf').addEventListener('change', syncMaterial);
+
+  canvas.addEventListener('dblclick', () => {
+    if (currentMesh) fitCamera(currentMesh.geometry);
+  });
+
+  window.addEventListener('resize', () => {
+    setSize();
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  // ── Render loop ────────────────────────────────────────────────────────
+  (function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  })();
+
+  // Load first model on startup
+  loadSelected();
+</script>
 </body>
 </html>
