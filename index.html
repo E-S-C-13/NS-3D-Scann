@@ -4,7 +4,10 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>3D Scan Comparison · GOM vs Creality Ferret</title>
-  <script src="https://cdn.jsdelivr.net/npm/online-3d-viewer@0.12.2/build/engine/o3dv.min.js"></script>
+
+  <!-- Latest stable o3dv (0.18.0) -->
+  <script src="https://cdn.jsdelivr.net/npm/online-3d-viewer@0.18.0/build/engine/o3dv.min.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -20,7 +23,6 @@
       --mono:    'JetBrains Mono','Fira Mono','Courier New',monospace;
     }
     html, body { height: 100%; background: var(--ink); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; overflow: hidden; }
-
     #app { display: grid; grid-template-rows: 54px 1fr; height: 100vh; }
 
     /* Top bar */
@@ -65,7 +67,8 @@
     .error-overlay { position: absolute; inset: 0; background: rgba(11,13,16,.92); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 11; }
     .error-overlay.visible { display: flex; }
     .error-icon { font-size: 2rem; }
-    .error-msg { font-family: var(--mono); font-size: .72rem; color: #f87171; text-align: center; max-width: 260px; line-height: 1.6; }
+    .error-msg { font-family: var(--mono); font-size: .72rem; color: #f87171; text-align: center; max-width: 280px; line-height: 1.6; }
+    .error-msg code { font-size: .65rem; color: #fca5a5; display: block; margin-top: 6px; word-break: break-all; }
 
     @media (max-width: 640px) {
       #viewers { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
@@ -83,36 +86,36 @@
       <label for="scan-selector">Object</label>
       <select id="scan-selector">
         <!--
-          HOW TO ADD YOUR MODELS
-          ──────────────────────
-          Each option value has 6 fields separated by |
+          ╔══════════════════════════════════════════════════════════════╗
+          ║  HOW TO CONFIGURE YOUR MODELS                               ║
+          ║                                                              ║
+          ║  Each <option> value has this format (pipe-separated):       ║
+          ║                                                              ║
+          ║  LEFT_FILES | LEFT_LABEL | RIGHT_FILES | RIGHT_LABEL        ║
+          ║                                                              ║
+          ║  LEFT_FILES  = space-separated file paths for GOM panel      ║
+          ║  RIGHT_FILES = space-separated file paths for Ferret panel   ║
+          ║                (for PLY + texture: "model.ply model.jpg")    ║
+          ║                                                              ║
+          ║  Paths are relative to this index.html                       ║
+          ║  OR use full raw.githubusercontent.com URLs                  ║
+          ║                                                              ║
+          ║  EXAMPLE (files in your repo under /models/):               ║
+          ║                                                              ║
+          ║  models/scan1.stl|Scan 1 GOM|models/scan1.ply models/scan1.jpg|Scan 1 Ferret
+          ╚══════════════════════════════════════════════════════════════╝
 
-            [0] GOM file(s)    — relative path(s), space-separated if multiple
-            [1] (unused, kept for clarity)
-            [2] GOM label text
-            [3] Ferret file(s) — relative path(s), space-separated (PLY + JPG)
-            [4] (unused)
-            [5] Ferret label text
-
-          EXAMPLES:
-            GOM STL only:
-              models/scan1_gom.stl
-
-            Ferret PLY + texture JPG:
-              models/scan1_ferret.ply models/scan1_ferret.jpg
-
-          Paths are relative to this index.html file.
+          UPDATE THESE — replace with your actual file names:
         -->
-        <option value="models/model1.stl||Object 1 — GOM|models/model2.ply models/model2.jpg||Object 1 — Ferret">Object 1</option>
-        <option value="models/obj2_gom.stl||Object 2 — GOM|models/obj2_ferret.ply models/obj2_ferret.jpg||Object 2 — Ferret">Object 2</option>
-        <option value="models/obj3_gom.stl||Object 3 — GOM|models/obj3_ferret.ply models/obj3_ferret.jpg||Object 3 — Ferret">Object 3</option>
-        <option value="models/obj4_gom.stl||Object 4 — GOM|models/obj4_ferret.ply models/obj4_ferret.jpg||Object 4 — Ferret">Object 4</option>
+        <option value="models/model1.stl|Object 1 — GOM|models/model2.ply models/model2.jpg|Object 1 — Ferret">Object 1</option>
+        <option value="models/obj2_gom.stl|Object 2 — GOM|models/obj2_ferret.ply models/obj2_ferret.jpg|Object 2 — Ferret">Object 2</option>
+        <option value="models/obj3_gom.stl|Object 3 — GOM|models/obj3_ferret.ply models/obj3_ferret.jpg|Object 3 — Ferret">Object 3</option>
+        <option value="models/obj4_gom.stl|Object 4 — GOM|models/obj4_ferret.ply models/obj4_ferret.jpg|Object 4 — Ferret">Object 4</option>
       </select>
     </div>
   </header>
 
   <section id="viewers">
-
     <!-- LEFT: GOM -->
     <div class="viewer-col">
       <div class="viewer-label">
@@ -124,11 +127,11 @@
         <div id="gom-viewer" class="ov-viewer"></div>
         <div class="loading-overlay" id="gom-loading">
           <div class="spinner gom-spinner"></div>
-          <div class="loading-text" id="gom-loading-text">Loading…</div>
+          <div class="loading-text">Loading GOM scan…</div>
         </div>
         <div class="error-overlay" id="gom-error">
           <div class="error-icon">⚠</div>
-          <div class="error-msg" id="gom-error-msg">Could not load model.<br>Check the file path.</div>
+          <div class="error-msg" id="gom-error-msg">Could not load model.</div>
         </div>
       </div>
     </div>
@@ -144,117 +147,102 @@
         <div id="ferret-viewer" class="ov-viewer"></div>
         <div class="loading-overlay" id="ferret-loading">
           <div class="spinner ferret-spinner"></div>
-          <div class="loading-text" id="ferret-loading-text">Loading…</div>
+          <div class="loading-text">Loading Ferret scan…</div>
         </div>
         <div class="error-overlay" id="ferret-error">
           <div class="error-icon">⚠</div>
-          <div class="error-msg" id="ferret-error-msg">Could not load model.<br>Check the file path.</div>
+          <div class="error-msg" id="ferret-error-msg">Could not load model.</div>
         </div>
       </div>
     </div>
-
   </section>
 </div>
 
 <script>
-  // Convert a relative path to an absolute URL based on this page's location.
-  // This is required because o3dv's URL loader needs full absolute URLs.
-  function toAbsolute(relativePath) {
-    var base = window.location.href.replace(/\/[^\/]*$/, '/');
-    // If it's already absolute (starts with http), leave it alone
-    if (/^https?:\/\//i.test(relativePath)) return relativePath;
-    return base + relativePath;
-  }
-
-  var BG = new OV.RGBAColor(11, 13, 16, 255);
-
   var gomViewer    = null;
   var ferretViewer = null;
 
-  function makeViewer(elementId, onLoaded, onFailed) {
+  // Convert a relative path → absolute URL.
+  // o3dv needs absolute URLs; this handles both relative paths and
+  // already-absolute URLs (raw.githubusercontent.com etc.) transparently.
+  function toAbsolute(path) {
+    path = path.trim();
+    if (/^https?:\/\//i.test(path)) return path;
+    // Build base from current page URL (strip filename if present)
+    var base = window.location.href.split('?')[0].split('#')[0];
+    if (!base.endsWith('/')) base = base.substring(0, base.lastIndexOf('/') + 1);
+    return base + path;
+  }
+
+  function showLoading(side) {
+    document.getElementById(side + '-loading').classList.remove('hidden');
+    document.getElementById(side + '-error').classList.remove('visible');
+  }
+
+  function hideLoading(side) {
+    document.getElementById(side + '-loading').classList.add('hidden');
+  }
+
+  function showError(side, files) {
+    hideLoading(side);
+    var el = document.getElementById(side + '-error');
+    var msg = document.getElementById(side + '-error-msg');
+    el.classList.add('visible');
+    msg.innerHTML = 'Could not load model.<br><code>' + files.join('<br>') + '</code><br><br>Check the file exists and is committed to your repo.';
+  }
+
+  function createViewer(elementId, onLoaded, onFailed) {
     var el = document.getElementById(elementId);
-    el.innerHTML = ''; // clear previous canvas
+    el.innerHTML = '';  // clear any previous canvas
     return new OV.EmbeddedViewer(el, {
-      backgroundColor: BG,
-      defaultColor:    new OV.RGBColor(160, 170, 185),
-      edgeSettings:    new OV.EdgeSettings(false, new OV.RGBColor(0, 0, 0), 1),
-      onModelLoaded:   onLoaded,
+      backgroundColor:   new OV.RGBAColor(11, 13, 16, 255),
+      defaultColor:      new OV.RGBColor(160, 170, 185),
+      edgeSettings:      new OV.EdgeSettings(false, new OV.RGBColor(0, 0, 0), 1),
+      onModelLoaded:     onLoaded,
       onModelLoadFailed: onFailed
     });
   }
 
-  function showLoading(id, text) {
-    var ov = document.getElementById(id + '-loading');
-    var tx = document.getElementById(id + '-loading-text');
-    var er = document.getElementById(id + '-error');
-    if (ov) ov.classList.remove('hidden');
-    if (tx) tx.textContent = text || 'Loading…';
-    if (er) er.classList.remove('visible');
-  }
+  function loadSide(side, files, label) {
+    document.getElementById(side + '-meta').textContent = label;
+    showLoading(side);
 
-  function hideLoading(id) {
-    var el = document.getElementById(id + '-loading');
-    if (el) el.classList.add('hidden');
-  }
+    // Destroy previous viewer cleanly
+    if (side === 'gom' && gomViewer)    { try { gomViewer.Destroy();    } catch(e){} gomViewer    = null; }
+    if (side === 'ferret' && ferretViewer) { try { ferretViewer.Destroy(); } catch(e){} ferretViewer = null; }
 
-  function showError(id, path) {
-    hideLoading(id);
-    var er  = document.getElementById(id + '-error');
-    var msg = document.getElementById(id + '-error-msg');
-    if (er)  er.classList.add('visible');
-    if (msg) msg.innerHTML = 'Could not load:<br><code style="font-size:.65rem;color:#fca5a5">' + path + '</code><br><br>Check the file is committed to your repo.';
-  }
+    var urls = files.map(toAbsolute);
 
-  function loadPair(gomFiles, ferretFiles, gomLabel, ferretLabel) {
-    // Update sidebar labels
-    document.getElementById('gom-meta').textContent    = gomLabel;
-    document.getElementById('ferret-meta').textContent = ferretLabel;
-
-    // Convert relative → absolute URLs
-    var gomUrls    = gomFiles.map(toAbsolute);
-    var ferretUrls = ferretFiles.map(toAbsolute);
-
-    // Destroy old viewers cleanly
-    if (gomViewer)    { try { gomViewer.Destroy();    } catch(e) {} }
-    if (ferretViewer) { try { ferretViewer.Destroy(); } catch(e) {} }
-
-    showLoading('gom',    'Loading GOM scan…');
-    showLoading('ferret', 'Loading Ferret scan…');
-
-    gomViewer = makeViewer(
-      'gom-viewer',
-      function() { hideLoading('gom'); },
-      function() { showError('gom', gomFiles.join(', ')); }
+    var viewer = createViewer(
+      side + '-viewer',
+      function() { hideLoading(side); },
+      function() { showError(side, files); }
     );
 
-    ferretViewer = makeViewer(
-      'ferret-viewer',
-      function() { hideLoading('ferret'); },
-      function() { showError('ferret', ferretFiles.join(', ')); }
-    );
+    viewer.LoadModelFromUrlList(urls);
 
-    gomViewer.LoadModelFromUrlList(gomUrls);
-    ferretViewer.LoadModelFromUrlList(ferretUrls);
+    if (side === 'gom')    gomViewer    = viewer;
+    if (side === 'ferret') ferretViewer = viewer;
   }
 
   function onScanChange() {
-    var val    = document.getElementById('scan-selector').value;
-    var parts  = val.split('|');
-    // parts[0] = gom files (space-sep), parts[2] = gom label
-    // parts[3] = ferret files (space-sep), parts[5] = ferret label
+    var val   = document.getElementById('scan-selector').value;
+    var parts = val.split('|');
+    // parts[0] = gom file paths (space-sep)
+    // parts[1] = gom label
+    // parts[2] = ferret file paths (space-sep)
+    // parts[3] = ferret label
     var gomFiles    = parts[0].trim().split(/\s+/);
-    var ferretFiles = parts[3].trim().split(/\s+/);
-    var gomLabel    = parts[2] || 'GOM';
-    var ferretLabel = parts[5] || 'Ferret';
+    var gomLabel    = parts[1] || 'GOM';
+    var ferretFiles = parts[2].trim().split(/\s+/);
+    var ferretLabel = parts[3] || 'Ferret';
 
-    loadPair(gomFiles, ferretFiles, gomLabel, ferretLabel);
+    loadSide('gom',    gomFiles,    gomLabel);
+    loadSide('ferret', ferretFiles, ferretLabel);
   }
 
   document.getElementById('scan-selector').addEventListener('change', onScanChange);
-
-  window.addEventListener('load', function() {
-    onScanChange();
-  });
+  window.addEventListener('load', onScanChange);
 </script>
 </body>
 </html>
