@@ -4,275 +4,113 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>3D Scan Comparison · GOM vs Creality Ferret</title>
-
-  <!--
-    Online3DViewer engine (o3dv) — handles STL, PLY+texture, OBJ+MTL and more.
-    Load from jsDelivr (CDN) — no install needed.
-    Docs: https://kovacsv.github.io/Online3DViewer/Page_Usage.html
-  -->
   <script src="https://cdn.jsdelivr.net/npm/online-3d-viewer@0.12.2/build/engine/o3dv.min.js"></script>
-
   <style>
-    /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* ── Tokens ── */
     :root {
-      --ink:       #0b0d10;
-      --surface:   #13161b;
-      --panel:     #1a1e26;
-      --border:    #272c38;
-      --rule:      #323844;
-      --gom:       #e8c96a;   /* warm gold  — GOM brand feel */
-      --ferret:    #5db8f5;   /* cool blue  — Creality Ferret */
-      --text:      #dce3ee;
-      --muted:     #5a6478;
-      --radius:    6px;
-      --mono:      'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+      --ink:     #0b0d10;
+      --surface: #13161b;
+      --panel:   #1a1e26;
+      --border:  #272c38;
+      --gom:     #e8c96a;
+      --ferret:  #5db8f5;
+      --text:    #dce3ee;
+      --muted:   #5a6478;
+      --radius:  6px;
+      --mono:    'JetBrains Mono','Fira Mono','Courier New',monospace;
     }
+    html, body { height: 100%; background: var(--ink); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; overflow: hidden; }
 
-    html, body {
-      height: 100%;
-      background: var(--ink);
-      color: var(--text);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 14px;
-      overflow: hidden;
-    }
+    #app { display: grid; grid-template-rows: 54px 1fr; height: 100vh; }
 
-    /* ── Layout ── */
-    #app {
-      display: grid;
-      grid-template-rows: 54px 1fr;
-      height: 100vh;
-    }
-
-    /* ── Top bar ── */
-    #topbar {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      padding: 0 20px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    #topbar h1 {
-      font-family: var(--mono);
-      font-size: .78rem;
-      font-weight: 400;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    #topbar h1 span {
-      color: var(--text);
-      font-weight: 700;
-    }
-
-    .separator {
-      width: 1px;
-      height: 24px;
-      background: var(--border);
-      flex-shrink: 0;
-    }
-
-    /* Selector */
-    .selector-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .selector-wrap label {
-      font-family: var(--mono);
-      font-size: .68rem;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-    #scan-selector {
-      background: var(--panel);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 6px 28px 6px 10px;
-      font-size: .82rem;
-      font-family: inherit;
-      cursor: pointer;
-      outline: none;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%235a6478' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 9px center;
-      transition: border-color .15s;
-      min-width: 180px;
-    }
+    /* Top bar */
+    #topbar { display: flex; align-items: center; gap: 20px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    #topbar h1 { font-family: var(--mono); font-size: .78rem; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+    #topbar h1 span { color: var(--text); font-weight: 700; }
+    .sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+    .selector-wrap { display: flex; align-items: center; gap: 10px; }
+    .selector-wrap label { font-family: var(--mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+    #scan-selector { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 28px 6px 10px; font-size: .82rem; font-family: inherit; cursor: pointer; outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%235a6478' d='M5 6L0 0h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; transition: border-color .15s; min-width: 180px; }
     #scan-selector:hover, #scan-selector:focus { border-color: var(--gom); }
 
-    /* ── Viewer area ── */
-    #viewers {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      min-height: 0;
-    }
-
-    .viewer-col {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      position: relative;
-    }
-    .viewer-col + .viewer-col {
-      border-left: 2px solid var(--border);
-    }
+    /* Viewers */
+    #viewers { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+    .viewer-col { display: flex; flex-direction: column; min-height: 0; position: relative; }
+    .viewer-col + .viewer-col { border-left: 2px solid var(--border); }
 
     /* Label bar */
-    .viewer-label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 14px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .label-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .gom-dot   { background: var(--gom); box-shadow: 0 0 6px var(--gom); }
-    .ferret-dot{ background: var(--ferret); box-shadow: 0 0 6px var(--ferret); }
-
-    .label-name {
-      font-family: var(--mono);
-      font-size: .75rem;
-      font-weight: 700;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-    }
+    .viewer-label { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .label-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .gom-dot    { background: var(--gom);    box-shadow: 0 0 6px var(--gom); }
+    .ferret-dot { background: var(--ferret); box-shadow: 0 0 6px var(--ferret); }
+    .label-name { font-family: var(--mono); font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
     .gom-name    { color: var(--gom); }
     .ferret-name { color: var(--ferret); }
+    .label-meta { font-family: var(--mono); font-size: .66rem; color: var(--muted); margin-left: auto; }
 
-    .label-meta {
-      font-family: var(--mono);
-      font-size: .66rem;
-      color: var(--muted);
-      margin-left: auto;
-    }
+    /* Viewer div */
+    .viewer-wrap { flex: 1; min-height: 0; position: relative; }
+    .ov-viewer { width: 100%; height: 100%; }
 
-    /* The actual viewer div — o3dv fills it */
-    .viewer-wrap {
-      flex: 1;
-      min-height: 0;
-      position: relative;
-    }
-    .ov-viewer {
-      width: 100%;
-      height: 100%;
-    }
-
-    /* Loading overlay per panel */
-    .loading-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(11,13,16,.85);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      z-index: 10;
-      pointer-events: none;
-      transition: opacity .3s;
-    }
-    .loading-overlay.hidden { opacity: 0; }
-    .spinner {
-      width: 36px; height: 36px;
-      border: 2px solid var(--border);
-      border-radius: 50%;
-      animation: spin .9s linear infinite;
-    }
+    /* Loading overlay */
+    .loading-overlay { position: absolute; inset: 0; background: rgba(11,13,16,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 10; transition: opacity .4s; }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .spinner { width: 36px; height: 36px; border: 2px solid var(--border); border-radius: 50%; animation: spin .9s linear infinite; }
     .gom-spinner    { border-top-color: var(--gom); }
     .ferret-spinner { border-top-color: var(--ferret); }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-text {
-      font-family: var(--mono);
-      font-size: .7rem;
-      letter-spacing: .08em;
-      color: var(--muted);
-    }
+    .loading-text { font-family: var(--mono); font-size: .7rem; letter-spacing: .08em; color: var(--muted); }
 
-    /* ── Divider drag handle (visual only) ── */
-    #divider-hint {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 18px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-      pointer-events: none;
-      z-index: 5;
-      opacity: .35;
-    }
-    #divider-hint span {
-      display: block;
-      width: 2px; height: 6px;
-      background: var(--rule);
-      border-radius: 2px;
-    }
+    /* Error state */
+    .error-overlay { position: absolute; inset: 0; background: rgba(11,13,16,.92); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 11; }
+    .error-overlay.visible { display: flex; }
+    .error-icon { font-size: 2rem; }
+    .error-msg { font-family: var(--mono); font-size: .72rem; color: #f87171; text-align: center; max-width: 260px; line-height: 1.6; }
 
-    /* ── Responsive: stack on narrow screens ── */
     @media (max-width: 640px) {
       #viewers { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
       .viewer-col + .viewer-col { border-left: none; border-top: 2px solid var(--border); }
-      #divider-hint { display: none; }
     }
   </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- ── Top bar ── -->
   <header id="topbar">
     <h1>Scan <span>Compare</span></h1>
-    <div class="separator"></div>
+    <div class="sep"></div>
     <div class="selector-wrap">
       <label for="scan-selector">Object</label>
       <select id="scan-selector">
         <!--
-          FORMAT of each option value:
-          GOM_URL | GOM_EXT | GOM_LABEL | FERRET_URL | FERRET_EXT | FERRET_LABEL
+          HOW TO ADD YOUR MODELS
+          ──────────────────────
+          Each option value has 6 fields separated by |
 
-          For PLY + texture: separate the PLY and JPG with a space in the URL field
-          e.g.  https://yourdomain.com/scans/obj1_ferret.ply https://yourdomain.com/scans/obj1_ferret.jpg
+            [0] GOM file(s)    — relative path(s), space-separated if multiple
+            [1] (unused, kept for clarity)
+            [2] GOM label text
+            [3] Ferret file(s) — relative path(s), space-separated (PLY + JPG)
+            [4] (unused)
+            [5] Ferret label text
 
-          UPDATE THESE URLS to point to your files on your host.
+          EXAMPLES:
+            GOM STL only:
+              models/scan1_gom.stl
+
+            Ferret PLY + texture JPG:
+              models/scan1_ferret.ply models/scan1_ferret.jpg
+
+          Paths are relative to this index.html file.
         -->
-        <option value="http://e-s-c.me/static/3dscan/Audi_Scheinwerfer_ohne_Marker.stl|stl|Object 1 — GOM|https://yourdomain.com/scans/obj1_ferret.ply https://yourdomain.com/scans/obj1_ferret.jpg|ply|Object 1 — Ferret">
-          Object 1
-        </option>
-        <option value="https://github.com/E-S-C-13/NS-3D-Scann/blob/main/models/model1.stl|stl|Object 2 — GOM|https://github.com/E-S-C-13/NS-3D-Scann/blob/main/models/model2.ply https://yourdomain.com/scans/obj2_ferret.jpg|ply|Object 2 — Ferret">
-          Object 2
-        </option>
-        <option value="https://yourdomain.com/scans/obj3_gom.stl|stl|Object 3 — GOM|https://yourdomain.com/scans/obj3_ferret.ply https://yourdomain.com/scans/obj3_ferret.jpg|ply|Object 3 — Ferret">
-          Object 3
-        </option>
-        <option value="https://yourdomain.com/scans/obj4_gom.stl|stl|Object 4 — GOM|https://yourdomain.com/scans/obj4_ferret.ply https://yourdomain.com/scans/obj4_ferret.jpg|ply|Object 4 — Ferret">
-          Object 4
-        </option>
+        <option value="models/model1.stl||Object 1 — GOM|models/model2.ply models/model2.jpg||Object 1 — Ferret">Object 1</option>
+        <option value="models/obj2_gom.stl||Object 2 — GOM|models/obj2_ferret.ply models/obj2_ferret.jpg||Object 2 — Ferret">Object 2</option>
+        <option value="models/obj3_gom.stl||Object 3 — GOM|models/obj3_ferret.ply models/obj3_ferret.jpg||Object 3 — Ferret">Object 3</option>
+        <option value="models/obj4_gom.stl||Object 4 — GOM|models/obj4_ferret.ply models/obj4_ferret.jpg||Object 4 — Ferret">Object 4</option>
       </select>
     </div>
   </header>
 
-  <!-- ── Viewer columns ── -->
   <section id="viewers">
 
     <!-- LEFT: GOM -->
@@ -280,13 +118,17 @@
       <div class="viewer-label">
         <span class="label-dot gom-dot"></span>
         <span class="label-name gom-name">GOM</span>
-        <span class="label-meta" id="gom-meta">STL · professional metrology</span>
+        <span class="label-meta" id="gom-meta">professional metrology</span>
       </div>
       <div class="viewer-wrap">
         <div id="gom-viewer" class="ov-viewer"></div>
         <div class="loading-overlay" id="gom-loading">
           <div class="spinner gom-spinner"></div>
-          <div class="loading-text">Loading GOM scan…</div>
+          <div class="loading-text" id="gom-loading-text">Loading…</div>
+        </div>
+        <div class="error-overlay" id="gom-error">
+          <div class="error-icon">⚠</div>
+          <div class="error-msg" id="gom-error-msg">Could not load model.<br>Check the file path.</div>
         </div>
       </div>
     </div>
@@ -296,13 +138,17 @@
       <div class="viewer-label">
         <span class="label-dot ferret-dot"></span>
         <span class="label-name ferret-name">Creality Ferret</span>
-        <span class="label-meta" id="ferret-meta">PLY · consumer scanner</span>
+        <span class="label-meta" id="ferret-meta">consumer scanner</span>
       </div>
       <div class="viewer-wrap">
         <div id="ferret-viewer" class="ov-viewer"></div>
         <div class="loading-overlay" id="ferret-loading">
           <div class="spinner ferret-spinner"></div>
-          <div class="loading-text">Loading Ferret scan…</div>
+          <div class="loading-text" id="ferret-loading-text">Loading…</div>
+        </div>
+        <div class="error-overlay" id="ferret-error">
+          <div class="error-icon">⚠</div>
+          <div class="error-msg" id="ferret-error-msg">Could not load model.<br>Check the file path.</div>
         </div>
       </div>
     </div>
@@ -310,72 +156,102 @@
   </section>
 </div>
 
-<!-- centre divider hint -->
-<div id="divider-hint"><span></span><span></span><span></span><span></span><span></span></div>
-
 <script>
-  // ── Viewer instances (reused across loads) ──────────────────────────────
+  // Convert a relative path to an absolute URL based on this page's location.
+  // This is required because o3dv's URL loader needs full absolute URLs.
+  function toAbsolute(relativePath) {
+    var base = window.location.href.replace(/\/[^\/]*$/, '/');
+    // If it's already absolute (starts with http), leave it alone
+    if (/^https?:\/\//i.test(relativePath)) return relativePath;
+    return base + relativePath;
+  }
+
+  var BG = new OV.RGBAColor(11, 13, 16, 255);
+
   var gomViewer    = null;
   var ferretViewer = null;
 
-  // Shared dark background colour for both panels
-  var BG = new OV.RGBAColor(11, 13, 16, 255);
-
-  function makeViewer(elementId) {
+  function makeViewer(elementId, onLoaded, onFailed) {
     var el = document.getElementById(elementId);
+    el.innerHTML = ''; // clear previous canvas
     return new OV.EmbeddedViewer(el, {
       backgroundColor: BG,
-      defaultColor: new OV.RGBColor(160, 170, 185),
-      edgeSettings: new OV.EdgeSettings(false, new OV.RGBColor(0, 0, 0), 1)
+      defaultColor:    new OV.RGBColor(160, 170, 185),
+      edgeSettings:    new OV.EdgeSettings(false, new OV.RGBColor(0, 0, 0), 1),
+      onModelLoaded:   onLoaded,
+      onModelLoadFailed: onFailed
     });
   }
 
-  function hideLoading(id) {
-    // o3dv doesn't expose a load-complete callback in the embed API,
-    // so we hide the overlay after a generous timeout.
-    // For large files, increase this value.
-    setTimeout(function() {
-      var el = document.getElementById(id);
-      if (el) el.classList.add('hidden');
-    }, 3500);
+  function showLoading(id, text) {
+    var ov = document.getElementById(id + '-loading');
+    var tx = document.getElementById(id + '-loading-text');
+    var er = document.getElementById(id + '-error');
+    if (ov) ov.classList.remove('hidden');
+    if (tx) tx.textContent = text || 'Loading…';
+    if (er) er.classList.remove('visible');
   }
 
-  // ── Load a pair of scans ────────────────────────────────────────────────
-  function loadPair(gomUrls, ferretUrls) {
-    // Show loading overlays
-    document.getElementById('gom-loading').classList.remove('hidden');
-    document.getElementById('ferret-loading').classList.remove('hidden');
+  function hideLoading(id) {
+    var el = document.getElementById(id + '-loading');
+    if (el) el.classList.add('hidden');
+  }
 
-    // Destroy old viewers and recreate (cleanest way to reset o3dv state)
-    document.getElementById('gom-viewer').innerHTML    = '';
-    document.getElementById('ferret-viewer').innerHTML = '';
-    gomViewer    = makeViewer('gom-viewer');
-    ferretViewer = makeViewer('ferret-viewer');
+  function showError(id, path) {
+    hideLoading(id);
+    var er  = document.getElementById(id + '-error');
+    var msg = document.getElementById(id + '-error-msg');
+    if (er)  er.classList.add('visible');
+    if (msg) msg.innerHTML = 'Could not load:<br><code style="font-size:.65rem;color:#fca5a5">' + path + '</code><br><br>Check the file is committed to your repo.';
+  }
+
+  function loadPair(gomFiles, ferretFiles, gomLabel, ferretLabel) {
+    // Update sidebar labels
+    document.getElementById('gom-meta').textContent    = gomLabel;
+    document.getElementById('ferret-meta').textContent = ferretLabel;
+
+    // Convert relative → absolute URLs
+    var gomUrls    = gomFiles.map(toAbsolute);
+    var ferretUrls = ferretFiles.map(toAbsolute);
+
+    // Destroy old viewers cleanly
+    if (gomViewer)    { try { gomViewer.Destroy();    } catch(e) {} }
+    if (ferretViewer) { try { ferretViewer.Destroy(); } catch(e) {} }
+
+    showLoading('gom',    'Loading GOM scan…');
+    showLoading('ferret', 'Loading Ferret scan…');
+
+    gomViewer = makeViewer(
+      'gom-viewer',
+      function() { hideLoading('gom'); },
+      function() { showError('gom', gomFiles.join(', ')); }
+    );
+
+    ferretViewer = makeViewer(
+      'ferret-viewer',
+      function() { hideLoading('ferret'); },
+      function() { showError('ferret', ferretFiles.join(', ')); }
+    );
 
     gomViewer.LoadModelFromUrlList(gomUrls);
     ferretViewer.LoadModelFromUrlList(ferretUrls);
-
-    hideLoading('gom-loading');
-    hideLoading('ferret-loading');
   }
 
-  // ── Parse selector value and trigger load ──────────────────────────────
   function onScanChange() {
     var val    = document.getElementById('scan-selector').value;
-    var halves = val.split('|');
-    // halves: [gomUrls, gomExt, gomLabel, ferretUrls, ferretExt, ferretLabel]
-    var gomUrls    = halves[0].trim().split(' ');
-    var ferretUrls = halves[3].trim().split(' ');
+    var parts  = val.split('|');
+    // parts[0] = gom files (space-sep), parts[2] = gom label
+    // parts[3] = ferret files (space-sep), parts[5] = ferret label
+    var gomFiles    = parts[0].trim().split(/\s+/);
+    var ferretFiles = parts[3].trim().split(/\s+/);
+    var gomLabel    = parts[2] || 'GOM';
+    var ferretLabel = parts[5] || 'Ferret';
 
-    document.getElementById('gom-meta').textContent    = halves[2] || 'GOM STL';
-    document.getElementById('ferret-meta').textContent = halves[5] || 'Ferret PLY';
-
-    loadPair(gomUrls, ferretUrls);
+    loadPair(gomFiles, ferretFiles, gomLabel, ferretLabel);
   }
 
   document.getElementById('scan-selector').addEventListener('change', onScanChange);
 
-  // ── Init on page load ──────────────────────────────────────────────────
   window.addEventListener('load', function() {
     onScanChange();
   });
